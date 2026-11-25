@@ -1,0 +1,163 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Sign in to Pinecone Energy",
+        "description": "Enter the phone number used by the Pinecone Energy app. We will send you an SMS code.",
+        "data": {
+          "phone": "Phone number"
+        }
+      },
+      "code": {
+        "title": "SMS verification code",
+        "description": "The code was sent to {phone}. It expires in 5 minutes.",
+        "data": {
+          "code": "Verification code"
+        }
+      },
+      "piles": {
+        "title": "Select charging piles",
+        "description": "Pick the piles to expose in Home Assistant.",
+        "data": {
+          "piles": "Charging piles"
+        }
+      },
+      "reauth_confirm": {
+        "title": "Re-authenticate",
+        "description": "The session expired. A new code will be sent to {phone}.",
+        "data": {}
+      },
+      "reauth_code": {
+        "title": "SMS verification code",
+        "data": {
+          "code": "Verification code"
+        }
+      }
+    },
+    "error": {
+      "invalid_phone": "Invalid phone number (11 digits expected)",
+      "send_code_failed": "Failed to send the verification code",
+      "invalid_auth": "Wrong or expired verification code",
+      "cannot_connect": "Cannot reach the Pinecone Energy cloud",
+      "no_devices": "No charging pile bound to this account"
+    },
+    "abort": {
+      "reauth_successful": "Re-authentication successful",
+      "unknown": "Unknown error"
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Pinecone Energy options",
+        "data": {
+          "piles": "Enabled piles",
+          "scan_interval": "Polling interval"
+        }
+      }
+    },
+    "error": {
+      "no_devices": "Select at least one charging pile"
+    }
+  },
+  "entity": {
+    "sensor": {
+      "status": {
+        "name": "Charging status"
+      },
+      "power": {
+        "name": "Charging power"
+      },
+      "session_energy": {
+        "name": "Session energy"
+      },
+      "session_duration": {
+        "name": "Session duration"
+      },
+      "soc": {
+        "name": "Battery level"
+      },
+      "voltage": {
+        "name": "Voltage"
+      },
+      "current": {
+        "name": "Current"
+      },
+      "signal": {
+        "name": "4G signal"
+      },
+      "today_energy": {
+        "name": "Energy today"
+      },
+      "today_sessions": {
+        "name": "Sessions today"
+      },
+      "today_duration": {
+        "name": "Duration today"
+      },
+      "order_code": {
+        "name": "Current order"
+      }
+    },
+    "binary_sensor": {
+      "online": {
+        "name": "Online"
+      },
+      "charging": {
+        "name": "Charging"
+      }
+    },
+    "switch": {
+      "charge": {
+        "name": "Start charging"
+      },
+      "silent_mode": {
+        "name": "Silent mode"
+      },
+      "self_recovery": {
+        "name": "Auto resume"
+      },
+      "plug_and_charge": {
+        "name": "Plug and charge"
+      },
+      "plan_enabled": {
+        "name": "Scheduled charging"
+      },
+      "public_pile": {
+        "name": "Public pile"
+      }
+    },
+    "number": {
+      "current_limit": {
+        "name": "Current limit"
+      },
+      "power_limit": {
+        "name": "Power limit"
+      }
+    },
+    "button": {
+      "unlock_gun": {
+        "name": "Unlock gun"
+      },
+      "refresh": {
+        "name": "Refresh"
+      },
+      "relogin": {
+        "name": "Re-login (SMS code)"
+      }
+    },
+    "time": {
+      "plan_start": {
+        "name": "Schedule start"
+      },
+      "plan_end": {
+        "name": "Schedule end"
+      }
+    },
+    "select": {
+      "plan_repeat": {
+        "name": "Schedule repeat"
+      }
+    }
+  }
+}

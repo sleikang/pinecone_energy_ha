@@ -1,0 +1,163 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "登录松果能源",
+        "description": "输入松果能源 APP 的登录手机号，我们会向该号码发送短信验证码。",
+        "data": {
+          "phone": "手机号"
+        }
+      },
+      "code": {
+        "title": "输入短信验证码",
+        "description": "验证码已发送到 {phone}，请在 5 分钟内输入。",
+        "data": {
+          "code": "短信验证码"
+        }
+      },
+      "piles": {
+        "title": "选择充电桩",
+        "description": "选择需要接入 Home Assistant 的充电桩（可多选）。",
+        "data": {
+          "piles": "充电桩"
+        }
+      },
+      "reauth_confirm": {
+        "title": "重新登录",
+        "description": "松果能源登录状态已失效，将向 {phone} 重新发送验证码。",
+        "data": {}
+      },
+      "reauth_code": {
+        "title": "输入短信验证码",
+        "data": {
+          "code": "短信验证码"
+        }
+      }
+    },
+    "error": {
+      "invalid_phone": "手机号格式不正确（需要 11 位中国大陆手机号）",
+      "send_code_failed": "验证码发送失败，请稍后再试",
+      "invalid_auth": "验证码错误或已过期",
+      "cannot_connect": "无法连接到松果能源服务器",
+      "no_devices": "账号下没有可用的充电桩，请先在 APP 中绑定"
+    },
+    "abort": {
+      "reauth_successful": "重新登录成功",
+      "unknown": "未知错误"
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "松果能源设置",
+        "data": {
+          "piles": "启用的充电桩",
+          "scan_interval": "刷新间隔"
+        }
+      }
+    },
+    "error": {
+      "no_devices": "请至少选择一个充电桩"
+    }
+  },
+  "entity": {
+    "sensor": {
+      "status": {
+        "name": "充电状态"
+      },
+      "power": {
+        "name": "充电功率"
+      },
+      "session_energy": {
+        "name": "本次充电电量"
+      },
+      "session_duration": {
+        "name": "本次充电时长"
+      },
+      "soc": {
+        "name": "电池电量"
+      },
+      "voltage": {
+        "name": "充电电压"
+      },
+      "current": {
+        "name": "充电电流"
+      },
+      "signal": {
+        "name": "4G 信号"
+      },
+      "today_energy": {
+        "name": "今日充电电量"
+      },
+      "today_sessions": {
+        "name": "今日充电次数"
+      },
+      "today_duration": {
+        "name": "今日充电时长"
+      },
+      "order_code": {
+        "name": "当前订单号"
+      }
+    },
+    "binary_sensor": {
+      "online": {
+        "name": "在线"
+      },
+      "charging": {
+        "name": "正在充电"
+      }
+    },
+    "switch": {
+      "charge": {
+        "name": "开始充电"
+      },
+      "silent_mode": {
+        "name": "静音模式"
+      },
+      "self_recovery": {
+        "name": "智联续充"
+      },
+      "plug_and_charge": {
+        "name": "即插即充"
+      },
+      "plan_enabled": {
+        "name": "计划充电"
+      },
+      "public_pile": {
+        "name": "公共充电桩"
+      }
+    },
+    "number": {
+      "current_limit": {
+        "name": "电流上限"
+      },
+      "power_limit": {
+        "name": "功率上限"
+      }
+    },
+    "button": {
+      "unlock_gun": {
+        "name": "解锁充电枪"
+      },
+      "refresh": {
+        "name": "刷新数据"
+      },
+      "relogin": {
+        "name": "重新登录（短信验证码）"
+      }
+    },
+    "time": {
+      "plan_start": {
+        "name": "计划开始时间"
+      },
+      "plan_end": {
+        "name": "计划结束时间"
+      }
+    },
+    "select": {
+      "plan_repeat": {
+        "name": "计划重复方式"
+      }
+    }
+  }
+}

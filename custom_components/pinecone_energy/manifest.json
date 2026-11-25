@@ -1,0 +1,12 @@
+{
+  "domain": "pinecone_energy",
+  "name": "松果能源充电桩",
+  "codeowners": [],
+  "config_flow": true,
+  "integration_type": "hub",
+  "iot_class": "cloud_polling",
+  "requirements": [],
+  "version": "1.2.1",
+  "documentation": "https://github.com/yourname/pinecone_energy#readme",
+  "issue_tracker": "https://github.com/yourname/pinecone_energy/issues"
+}
