@@ -8,6 +8,7 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ConfigEntryAuthFailed
+from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
 from .api import PineconeAuthError, PineconeClient, PineconeError
@@ -62,6 +63,16 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         raise
 
     hass.data.setdefault(DOMAIN, {})[entry.entry_id] = coordinator
+
+    # Drop entities that no longer exist in the integration (e.g. the 电池电量
+    # sensor, which only mirrored a static pile-side value and read 0% while
+    # charging). Without this HA keeps a permanently unavailable orphan.
+    registry = er.async_get(hass)
+    for entity in er.async_entries_for_config_entry(registry, entry.entry_id):
+        if entity.unique_id.endswith(("_soc", "_battery_level")):
+            _LOGGER.info("移除已废弃的实体 %s", entity.entity_id)
+            registry.async_remove(entity.entity_id)
+
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     entry.async_on_unload(entry.add_update_listener(_async_update_listener))
     return True

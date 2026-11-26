@@ -578,12 +578,19 @@ class PineconeClient:
         node = raw.get("chargingData") if isinstance(raw.get("chargingData"), dict) else raw.get("data", raw)
         if not isinstance(node, dict):
             node = {}
-        energy = _first(node, "energyKwh", "energy")
+        # The app renders "已充电量" from the bare `power` field (it is energy
+        # in kWh, misleading name), while kW comes from pilePower/currentPower.
+        energy = _first(node, "power", "energyKwh", "energy", "elect")
         duration = _first(node, "length", "chargeDuration", "durationMinutes")
-        power = _first(node, "currentPower", "chargingPower", "pilePower", "power")
+        power = _first(node, "pilePower", "currentPower", "chargingPower")
         soc = _first(node, "soc", "bmsCurrentSoc")
         voltage = _first(node, "voltage", "currentVoltage")
         current = _first(node, "current", "currentAmpere")
+        if power is None:
+            volts = _to_float(voltage)
+            amps = _to_float(current)
+            if volts is not None and amps is not None and volts > 0:
+                power = round(volts * amps / 1000, 3)
         order = _first(node, "orderCode", "order.code")
         start = _first(node, "startTime", "beginTime", "chargeStartTime")
         return {

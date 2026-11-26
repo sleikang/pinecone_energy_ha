@@ -385,3 +385,35 @@ App 代码里 `plugInCharge = !authStatus`（`Hm = e => e ? 0 : 1`），但平�
 
 修复前的坑：`PineconeAuthError` 只是被当成普通 `UpdateFailed`，HA 只会“重试”，不会弹重新认证，也没有入口——这就是之前“失效后没有登录入口”的原因。另外 `DataUpdateCoordinator` 必须传 `config_entry=entry`，否则它拿不到要重认证的条目（HA 源码里 `self.config_entry.async_start_reauth` 依赖它）。
 
+### 8.16 `power` 字段的真实含义（v1.3.0，由一笔真实订单定位）
+
+用 2026-11-26 00:00–07:01 的真实订单（`elect 35.6 kWh`、`durationMinutes 312`）对账，确认了 APP 侧的字段语义：
+
+| APP 展示 | 取的字段 | 说明 |
+|---|---|---|
+| 已充电量 | `pile/query/current/pile` 的 **`power`** | 名字像功率，实际是 **kWh**；`energyKwh` 云端根本不返回，这就是之前“本次充电电量一直未知”的原因 |
+| 功率 (kW) | `pilePower` → `currentPower` → `chargingPower`，都没有时用 `voltage × current / 1000` | APP 的 `mn` computed 就是这个顺序 |
+| 充电时长 | `length`（分钟） | 与日记录里的 `durationMinutes` 一致 |
+| 当前电量 | `soc` | 该桩空闲报 32%、充电报 0%，是桩侧缓存值，已从集成移除 |
+
+实测空闲态 payload：
+
+```json
+{"data":{"authStatus":1,"chargingMileage":"0.0","current":0.0,"gunCode":"34852445003401",
+ "gunStatus":{"code":0,"msg":"空闲"},"length":0,"pilePower":0.0,"power":0.0,
+ "voltage":0.0,"operatorId":52,"pileName":"银河21kW交流桩8524450034"}}
+```
+
+当日订单：
+
+```json
+{"totalElect":35.6,"totalCount":1,"totalDurationMinutes":312,
+ "page":{"resultSet":[{"durationMinutes":312,"elect":35.6,"startTime":"2026-11-26 00:00:06",
+  "endTime":"2026-11-26 07:01:18","orderCode":"2125620553409761280","orderStatus":4}]}}
+```
+
+集成对应改动：
+- `normalise_charging`：`energy` 改读 `power`，`power`（kW）改读 `pilePower/currentPower/chargingPower`，补 `V×A/1000` 兜底
+- 「本次充电电量 / 本次充电时长」空闲时回填当天最近一笔订单（这次显示 35.6 kWh / 312 min，不再 unknown）
+- 移除「电池电量」实体，并在 setup 时按 `config_entry` 清理残留注册表项（`unique_id` 以 `_soc`/`_battery_level` 结尾）
+

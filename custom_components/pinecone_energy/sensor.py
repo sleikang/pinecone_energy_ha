@@ -13,7 +13,6 @@ from homeassistant.components.sensor import (
 )
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import (
-    PERCENTAGE,
     UnitOfElectricCurrent,
     UnitOfElectricPotential,
     UnitOfEnergy,
@@ -36,17 +35,42 @@ def _stats_value(key: str) -> Callable[[PineconeEntity], Any]:
     return lambda entity: ((entity.data.get("stats") or {}) or {}).get(key)
 
 
+def _last_record(entity: PineconeEntity) -> dict[str, Any]:
+    """Most recent charging record of the day (fallback for idle state)."""
+    records = ((entity.data.get("stats") or {}).get("records") or [])
+    if not isinstance(records, list) or not records:
+        return {}
+    dicts = [r for r in records if isinstance(r, dict)]
+    if not dicts:
+        return {}
+    return max(dicts, key=lambda r: str(r.get("endTime") or r.get("startTime") or ""))
+
+
+def _session_energy(entity: PineconeEntity) -> Any:
+    """Live kWh while charging, otherwise the last completed order's energy."""
+    value = (entity.charging or {}).get("energy")
+    try:
+        if value is not None and float(value) > 0:
+            return value
+    except (TypeError, ValueError):
+        if value not in (None, ""):
+            return value
+    return _last_record(entity).get("elect")
+
+
+def _session_duration(entity: PineconeEntity) -> Any:
+    value = (entity.charging or {}).get("duration")
+    try:
+        if value is not None and float(value) > 0:
+            return value
+    except (TypeError, ValueError):
+        if value not in (None, ""):
+            return value
+    return _last_record(entity).get("durationMinutes")
+
+
 def _period_value(period: str) -> Callable[[PineconeEntity], Any]:
     return lambda entity: ((entity.data.get(period) or {}) or {}).get("total_energy")
-
-
-def _soc_value(entity: PineconeEntity) -> Any:
-    """Live SOC when charging, otherwise the pile's last reported SOC."""
-    value = (entity.charging or {}).get("soc")
-    if value not in (None, ""):
-        return value
-    detail = entity.data.get("detail") or {}
-    return detail.get("soc")
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -97,7 +121,7 @@ SENSORS: tuple[PineconeSensorDescription, ...] = (
         state_class=SensorStateClass.TOTAL,
         suggested_display_precision=2,
         icon="mdi:battery-charging",
-        value_fn=_charging_value("energy"),
+        value_fn=_session_energy,
     ),
     PineconeSensorDescription(
         key="session_duration",
@@ -106,16 +130,7 @@ SENSORS: tuple[PineconeSensorDescription, ...] = (
         device_class=SensorDeviceClass.DURATION,
         state_class=SensorStateClass.TOTAL,
         icon="mdi:timer-outline",
-        value_fn=_charging_value("duration"),
-    ),
-    PineconeSensorDescription(
-        key="soc",
-        name="电池电量",
-        native_unit_of_measurement=PERCENTAGE,
-        device_class=SensorDeviceClass.BATTERY,
-        state_class=SensorStateClass.MEASUREMENT,
-        icon="mdi:battery",
-        value_fn=_soc_value,
+        value_fn=_session_duration,
     ),
     PineconeSensorDescription(
         key="voltage",
