@@ -52,7 +52,8 @@
         "title": "Pinecone Energy options",
         "data": {
           "piles": "Enabled piles",
-          "scan_interval": "Polling interval"
+          "scan_interval": "Polling interval",
+          "history_days": "History cache period (days)"
         }
       }
     },

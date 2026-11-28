@@ -24,12 +24,16 @@ from homeassistant.helpers.selector import (
 
 from .api import PineconeAuthError, PineconeClient, PineconeError
 from .const import (
+    CONF_HISTORY_DAYS,
     CONF_PHONE,
     CONF_PILES,
     CONF_TOKEN,
+    DEFAULT_HISTORY_DAYS,
     DEFAULT_SCAN_INTERVAL,
     DOMAIN,
+    MAX_HISTORY_DAYS,
     MAX_SCAN_INTERVAL,
+    MIN_HISTORY_DAYS,
     MIN_SCAN_INTERVAL,
 )
 
@@ -127,7 +131,10 @@ class PineconeConfigFlow(ConfigFlow, domain=DOMAIN):
                         CONF_TOKEN: self._token,
                         CONF_PILES: selected,
                     },
-                    options={CONF_SCAN_INTERVAL: DEFAULT_SCAN_INTERVAL},
+                    options={
+                        CONF_SCAN_INTERVAL: DEFAULT_SCAN_INTERVAL,
+                        CONF_HISTORY_DAYS: DEFAULT_HISTORY_DAYS,
+                    },
                 )
 
         return self.async_show_form(
@@ -240,6 +247,9 @@ class PineconeOptionsFlow(OptionsFlow):
                     data={
                         CONF_PILES: selected,
                         CONF_SCAN_INTERVAL: int(user_input[CONF_SCAN_INTERVAL]),
+                        CONF_HISTORY_DAYS: int(
+                            user_input.get(CONF_HISTORY_DAYS, DEFAULT_HISTORY_DAYS)
+                        ),
                     },
                 )
 
@@ -264,6 +274,22 @@ class PineconeOptionsFlow(OptionsFlow):
                             max=MAX_SCAN_INTERVAL,
                             step=5,
                             unit_of_measurement="s",
+                            mode=NumberSelectorMode.BOX,
+                        )
+                    ),
+                    vol.Required(
+                        CONF_HISTORY_DAYS,
+                        default=int(
+                            self.entry.options.get(
+                                CONF_HISTORY_DAYS, DEFAULT_HISTORY_DAYS
+                            )
+                        ),
+                    ): NumberSelector(
+                        NumberSelectorConfig(
+                            min=MIN_HISTORY_DAYS,
+                            max=MAX_HISTORY_DAYS,
+                            step=1,
+                            unit_of_measurement="天",
                             mode=NumberSelectorMode.BOX,
                         )
                     ),

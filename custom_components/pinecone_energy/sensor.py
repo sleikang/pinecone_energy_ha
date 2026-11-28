@@ -25,6 +25,7 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from .const import DOMAIN
 from .coordinator import PineconeCoordinator
 from .entity import PineconeEntity
+from .history import current_key
 
 
 def _charging_value(key: str) -> Callable[[PineconeEntity], Any]:
@@ -76,6 +77,8 @@ def _period_value(period: str) -> Callable[[PineconeEntity], Any]:
 @dataclass(frozen=True, kw_only=True)
 class PineconeSensorDescription(SensorEntityDescription):
     value_fn: Callable[[PineconeEntity], Any] = lambda entity: None
+    # Period the cached history attribute belongs to (day/week/month/year).
+    history_period: str | None = None
 
 
 SENSORS: tuple[PineconeSensorDescription, ...] = (
@@ -169,6 +172,7 @@ SENSORS: tuple[PineconeSensorDescription, ...] = (
         suggested_display_precision=2,
         icon="mdi:chart-bar",
         value_fn=_stats_value("total_energy"),
+        history_period="day",
     ),
     PineconeSensorDescription(
         key="today_sessions",
@@ -195,6 +199,7 @@ SENSORS: tuple[PineconeSensorDescription, ...] = (
         suggested_display_precision=2,
         icon="mdi:calendar-week",
         value_fn=_period_value("week"),
+        history_period="week",
     ),
     PineconeSensorDescription(
         key="month_energy",
@@ -205,6 +210,7 @@ SENSORS: tuple[PineconeSensorDescription, ...] = (
         suggested_display_precision=2,
         icon="mdi:calendar-month",
         value_fn=_period_value("month"),
+        history_period="month",
     ),
     PineconeSensorDescription(
         key="year_energy",
@@ -215,6 +221,7 @@ SENSORS: tuple[PineconeSensorDescription, ...] = (
         suggested_display_precision=2,
         icon="mdi:calendar",
         value_fn=_period_value("year"),
+        history_period="year",
     ),
     PineconeSensorDescription(
         key="order_code",
@@ -268,6 +275,25 @@ class PineconeSensor(PineconeEntity, SensorEntity):
             value = self.entity_description.value_fn(self)
         except (TypeError, ValueError, KeyError):
             return None
+        if value in ("", None) and self.entity_description.history_period:
+            # Cloud hiccup: fall back to the last cached total of the period.
+            value = self._cached_period_value()
         if value in ("", None):
             return None
         return value
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any] | None:
+        """Rolling history of the period (day/week/month/year)."""
+        period = self.entity_description.history_period
+        if not period:
+            return None
+        return self.coordinator.history.attributes(self.pile_code, period)
+
+    def _cached_period_value(self) -> float | None:
+        period = self.entity_description.history_period
+        if not period:
+            return None
+        return self.coordinator.history.merged_energy(
+            self.pile_code, period, current_key(period)
+        )

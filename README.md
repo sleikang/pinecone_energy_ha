@@ -5,6 +5,7 @@
 - ✅ 手机号 + 短信验证码登录，token 自动保存、失效自动提醒重新认证
 - ✅ 纯云端通信，**不需要蓝牙**，不需要手机常连桩
 - ✅ 启动/停止充电、解锁枪、电流/功率限制、静音模式、智联续充、即插即充、计划充电、实时数据、充电统计
+- ✅ 今日/本周/本月/今年电量自带**历史缓存**（属性里含历史日/周/月/年，首次自动从云端回填，缓存周期可配置）
 - ✅ 官方 LOGO 图标（从 APK 矢量资源生成，含深色模式版本）
 - ✅ 支持 HACS 自定义仓库安装
 
@@ -20,7 +21,7 @@
 4. **重启 Home Assistant**
 5. 设置 → 设备与服务 → 添加集成 → 松果能源充电桩
 
-> 想发布成 HACS 仓库：把本目录直接推到 GitHub（根目录已含 `hacs.json`），打一个 `v1.3.0` Release 即可；`manifest.json` 里的 `documentation` / `issue_tracker` 换成你自己的仓库地址。
+> 想发布成 HACS 仓库：把本目录直接推到 GitHub（根目录已含 `hacs.json`），打一个 `v1.4.0` Release 即可；`manifest.json` 里的 `documentation` / `issue_tracker` 换成你自己的仓库地址。
 
 ### 方式 B：手动安装
 
@@ -40,6 +41,7 @@ config/custom_components/pinecone_energy/
 ├── const.py
 ├── coordinator.py
 ├── entity.py
+├── history.py              ← 周期电量历史缓存（.storage 落盘 + 云端回填）
 ├── manifest.json
 ├── number.py
 ├── plan.py
@@ -81,10 +83,10 @@ config/custom_components/pinecone_energy/
 | sensor | 本次充电时长 (min) | 同上，空闲时回填最近一笔 |
 | sensor | 充电电压 (V) / 充电电流 (A) | |
 | sensor | 4G 信号 | 0~4 格 |
-| sensor | 今日充电电量 / 次数 / 时长 | 云端统计 |
-| sensor | 本周充电电量 (kWh) | 本周（周一至今）逐日汇总 |
-| sensor | 本月充电电量 (kWh) | `charge/record/stats` MONTH |
-| sensor | 今年充电电量 (kWh) | `charge/record/stats` YEAR |
+| sensor | 今日充电电量 / 次数 / 时长 | 云端统计；电量实体的属性里有历史日 |
+| sensor | 本周充电电量 (kWh) | 本周（周一至今）逐日汇总；属性里有历史周 |
+| sensor | 本月充电电量 (kWh) | `charge/record/stats` MONTH；属性里有历史月 |
+| sensor | 今年充电电量 (kWh) | `charge/record/stats` YEAR；属性里有历史年 |
 | sensor | 当前订单号 | 默认隐藏 |
 | binary_sensor | 在线 / 正在充电 | |
 | switch | 开始充电 | 开=下发启动，关=按当前订单号停止 |
@@ -100,6 +102,59 @@ config/custom_components/pinecone_energy/
 | button | 重新登录（短信验证码） | 随时重新认证；token 失效时依然可用 |
 | time | 计划开始 / 结束时间 | |
 | select | 计划重复方式 | 每天 / 单次 |
+
+## 周期电量历史（属性）
+
+松果云端只返回**当前**周期（今日 / 本周 / 本月 / 今年）的合计值，没有历史序列。集成自己维护一份
+按日粒度的滚动缓存，把历史放进对应电量实体的属性里：
+
+| 实体 | 属性 | 含义 |
+|---|---|---|
+| 今日充电电量 | `history` | 历史日列表（`date` / `energy` / `count` / `duration`） |
+| 本周充电电量 | `history` | 历史周列表（`week` / `start` / `end` / `energy` / `count` / `duration`） |
+| 本月充电电量 | `history` | 历史月列表（`month` / `energy` / `count` / `duration`） |
+| 今年充电电量 | `history` | 历史年列表（`year` / `energy` / `count` / `duration`） |
+
+四个属性都附带 `history_count`（缓存总数）、`history_shown`（属性里列出的条数）、`oldest_*`、`newest_*`、`history_total_energy`、`cache_period_days`、`updated_at`。
+
+> 属性里只列**最近** 120 日 / 104 周 / 60 月 / 20 年（避免状态属性过大拖累数据库），超出时带 `history_truncated: true`，更早的数据仍保存在缓存里。
+
+工作方式：
+
+1. **持续缓存**：每次轮询（默认 30 秒）把当前的今日 / 本周 / 本月 / 今年合计写入缓存，跨周期自动切换键值，历史不会丢；
+2. **首次回填**：升级后的第一次启动，会用 `charge/record/stats` 的 `chartBuckets` 把云端已有的历史补齐
+   （年桶 → 月/年历史，月桶 → 日历史，日桶再汇总成周历史），之后每天增量补一次；
+3. **断电/停机补洞**：HA 停机几天后再启动，会把落下的日/月数据补回来；
+4. **缓存周期**：设置 → 设备与服务 → 松果能源 → 配置 → 「历史缓存周期（天）」，默认 730 天（30~3650），缩短后旧数据在下次写入时被裁剪；
+5. **缓存落盘**：数据存在 `.storage/pinecone_energy.<entry_id>.history`，重启 HA 不丢；云端请求失败时实体值会回落成缓存里的最新值。
+
+属性示例（今日充电电量）：
+
+```yaml
+history:                        # 最近 120 天，完整条数见 history_count
+  - date: "2026-09-01"
+    energy: 12.0
+    count: 3
+    duration: 420
+    source: cloud
+  - date: "2026-11-26"
+    energy: 35.6
+    count: 1
+    duration: 312
+    source: cloud
+  - date: "2026-11-28"
+    energy: 3.5
+    count: 1
+    duration: 120
+    source: live
+history_count: 63
+history_shown: 63
+oldest_date: "2026-09-01"
+newest_date: "2026-11-28"
+history_total_energy: 412.8
+cache_period_days: 730
+updated_at: "2026-11-28T09:30:00+08:00"
+```
 
 ## 自动化示例
 
@@ -186,6 +241,7 @@ python3 tools/pinecone_cli.py watch --pile 3617xxxxxxxx --count 5 --interval 5
 | 添加时提示「账号下没有可用的充电桩」 | 先在 App 里绑定桩，或用同一手机号确认账号正确 |
 | 实体变「不可用」 | token 失效（在 APP 里登录过就会这样，单会话机制），HA 会自动弹出「重新认证」，也可以直接按设备上的「重新登录（短信验证码）」按钮 |
 | 「本周充电电量」一直是 0 | 周维度服务端不提供，靠本周逐日记录累加；桩在某天没记录就是 0，属正常 |
+| 电量属性的 `history` 是空的 | 首次回填需要几分钟（约 25 次云端请求/台桩），期间属性会逐步出现数据；若桩本身没有任何充电记录，云端返回全 0，就不会写入空行 |
 | 停止充电失败「未获取到充电订单号」 | 设备没有进行中的订单（已停止/已拔枪），属正常保护 |
 | 状态显示「已离线」 | 桩本身 4G 掉线，云端查不到，需检查桩的网络 |
 | 电流上限最大值不对 | 上限取 `guns[0].ratedCurrent`，取不到再按功率推断（3.5/11 kW → 16 A，其余 → 32 A） |

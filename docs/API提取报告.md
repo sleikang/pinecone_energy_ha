@@ -417,3 +417,23 @@ App 代码里 `plugInCharge = !authStatus`（`Hm = e => e ? 0 : 1`），但平�
 - 「本次充电电量 / 本次充电时长」空闲时回填当天最近一笔订单（这次显示 35.6 kWh / 312 min，不再 unknown）
 - 移除「电池电量」实体，并在 setup 时按 `config_entry` 清理残留注册表项（`unique_id` 以 `_soc`/`_battery_level` 结尾）
 
+### 8.17 周期电量历史缓存（v1.4.0）
+
+问题：云端只给**当前**周期的合计（今日 `/day/page`、本月/今年 `/stats`），本周靠逐日累加，四个电量实体都没有历史序列。
+
+方案（`history.py` + `coordinator.py` 回填）：
+
+1. **实时写入**：每次 coordinator 刷新把今日 / 本周 / 本月 / 今年四个合计 upsert 进缓存（键分别是 `YYYY-MM-DD`、`YYYY-Www`、`YYYY-MM`、`YYYY`），跨周期自动换键，旧键保留成历史。
+2. **首次回填（只做一次，之后每天增量）**：
+   - `charge/record/stats` `periodType=YEAR` 的 `chartBuckets` 是**按月**的 12 个桶 → 同时得到「月历史」和「年合计」，一年只用 1 次请求；
+   - `periodType=MONTH` 的 `chartBuckets` 是**按日**的 30 个桶 → 得到「日历史」，一个月 1 次请求；
+   - 周历史由日桶汇总（同一 ISO 周的 7 天必须都落在回填窗口内，当前周不汇总、保持实时值）；
+   - 单台桩首次约 1 次/年 + 1 次/月（近 24 个月封顶），26 次请求左右，放在后台任务里跑，不阻塞首次刷新。
+3. **落盘**：`homeassistant.helpers.storage.Store`，key `pinecone_energy.<entry_id>.history`，延迟写盘（30 秒合并）。
+4. **缓存周期**：`history_days` 选项（30~3650，默认 730），按「周期起始日 ≥ 今天-N 天」裁剪；**当前正在进行的日/周/月/年永远保留**。
+5. **对外**：`today_energy` / `week_energy` / `month_energy` / `year_energy` 四个实体的 `extra_state_attributes` 输出 `history` 列表 + `history_count` / `history_shown` / `oldest_*` / `newest_*` / `history_total_energy` / `cache_period_days` / `updated_at`；云端取不到值时实体状态回落成缓存里的当期值。属性只列最近 120 日 / 104 周 / 60 月 / 20 年（超出带 `history_truncated: true`），避免状态属性过大拖慢 recorder。
+6. **无抖动写入**：`record()` 只有数值真的变化时才更新时间戳并排队写盘，桩空闲时既不产生 state 写入、也不产生磁盘写入；改动缓存周期会触发一次全量重扫（`backfill.retention` 与当前选项不一致时）。
+
+分桶字段：`bucketKey`（`2026-11-01`）、`elect`、`count`、`durationMinutes`（月桶按日、年桶按月，取前 7 / 10 位当键）。
+
+

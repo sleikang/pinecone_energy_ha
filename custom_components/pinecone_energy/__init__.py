@@ -13,13 +13,16 @@ from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
 from .api import PineconeAuthError, PineconeClient, PineconeError
 from .const import (
+    CONF_HISTORY_DAYS,
     CONF_PHONE,
     CONF_PILES,
     CONF_TOKEN,
+    DEFAULT_HISTORY_DAYS,
     DEFAULT_SCAN_INTERVAL,
     DOMAIN,
 )
 from .coordinator import PineconeCoordinator
+from .history import PineconeHistory
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -49,8 +52,17 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         raise ConfigEntryAuthFailed("没有选择任何充电桩")
 
     interval = int(entry.options.get(CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL))
+    retention = int(entry.options.get(CONF_HISTORY_DAYS, DEFAULT_HISTORY_DAYS))
+    history = PineconeHistory(hass, entry.entry_id, retention)
+    await history.async_load()
+
     coordinator = PineconeCoordinator(
-        hass, client, piles, scan_interval=interval, config_entry=entry
+        hass,
+        client,
+        piles,
+        scan_interval=interval,
+        config_entry=entry,
+        history=history,
     )
     coordinator.entry = entry
 
@@ -82,7 +94,12 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Unload a config entry."""
     unload_ok = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
     if unload_ok:
-        hass.data[DOMAIN].pop(entry.entry_id, None)
+        coordinator: PineconeCoordinator | None = hass.data[DOMAIN].pop(
+            entry.entry_id, None
+        )
+        if coordinator is not None:
+            # Flush the pending history write before the entry disappears.
+            await coordinator.history.async_save()
     return unload_ok
 
 

@@ -52,7 +52,8 @@
         "title": "松果能源设置",
         "data": {
           "piles": "启用的充电桩",
-          "scan_interval": "刷新间隔"
+          "scan_interval": "刷新间隔",
+          "history_days": "历史缓存周期（天）"
         }
       }
     },
